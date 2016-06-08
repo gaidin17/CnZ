@@ -1,13 +1,18 @@
 package Server;
 
+import Game.Game;
+import Game.CnZ;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.SynchronousQueue;
 
 public class Server {
+    private final static int NUMBER_OF_PLAYERS = 2;
 
     public static void main(String[] args) {
         Server server = new Server();
@@ -17,61 +22,19 @@ public class Server {
     public void startServer(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Server started and ready for connection on port: " + port);
-            while (true) {
+            Game game = new CnZ();
+            SynchronousQueue<Game> queue = new SynchronousQueue<>();
+            for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
                 Socket socket = serverSocket.accept();
-                new ServerThread(socket).start();
-
-
+                if (i == 0) {
+                    new ServerThreadForFirstClient(socket, queue, game).start();
+                } else {
+                    System.out.println("Second Player is Ready");
+                    new ServerThreadForSecondClient(socket, queue, game).start();
+                }
             }
         } catch (IOException ex) {
 
-        }
-    }
-
-    public class ServerThread extends Thread {
-        Socket socket;
-
-        public ServerThread(Socket socket) {
-            this.socket = socket;
-        }
-
-        @Override
-        public void run() {
-            try (
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                    PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
-                String message = null;
-                while ((message = reader.readLine()) != null) {
-                    System.out.println("Client message: " + message);
-                    writer.println("response: " + message);
-                }
-                socket.close();
-            } catch (IOException ex) {
-
-            }
-        }
-    }
-
-    public class ClientHandler extends Thread {
-        Socket socket;
-
-        public ClientHandler(Socket socket) {
-            this.socket = socket;
-        }
-
-        @Override
-        public void run() {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                 PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
-                String message = null;
-                writer.println("!!!!!!!!!");
-                while ((message = reader.readLine()) != null) {
-                    System.out.println("Client message: " + message);
-                }
-
-            } catch (IOException ex) {
-
-            }
         }
     }
 }
