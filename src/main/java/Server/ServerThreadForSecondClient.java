@@ -45,9 +45,18 @@ public class ServerThreadForSecondClient extends Thread {
                     writer.println("end");
                 }
                 System.out.println("Waiting for input SecondClient turn");
-                String stringTurn = reader.readLine();
-                String[] turn = stringTurn.split(",");
-                game.makeTurn("O", Integer.parseInt(turn[0]), Integer.parseInt(turn[1]));
+                while (true) {
+                    String stringTurn = reader.readLine();
+                    String[] turn = stringTurn.split(",");
+                    int lastI = Integer.parseInt(turn[0]);
+                    int lastJ = Integer.parseInt(turn[1]);
+                    if (game.isTurnAvailable(lastI, lastJ)) {
+                        game.makeTurn("X", lastI, lastJ);
+                        break;
+                    }
+                    writer.println("Input right data");
+                    writer.println("error");
+                }
                 try {
                     writer.println(game.showField());
                     queue.put(game);

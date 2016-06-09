@@ -7,4 +7,6 @@ public interface Game  {
     void makeTurn(String type, int i, int j);
     String showField();
     String getWinner();
+    boolean isTurnAvailable(int i, int j);
+    boolean isNoWinner();
 }

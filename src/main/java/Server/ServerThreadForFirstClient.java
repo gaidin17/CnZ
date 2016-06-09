@@ -16,11 +16,16 @@ public class ServerThreadForFirstClient extends Thread {
     private Socket socket;
     private SynchronousQueue<Game> queue;
     private Game game;
+    private int turnOrder;
 
     public ServerThreadForFirstClient(Socket socket, SynchronousQueue<Game> queue, Game game) {
         this.game = game;
         this.queue = queue;
         this.socket = socket;
+    }
+
+    public void setTurnOrder(int turnOrder) {
+        this.turnOrder = turnOrder;
     }
 
     public void run() {
@@ -48,9 +53,18 @@ public class ServerThreadForFirstClient extends Thread {
                 }
 
                 System.out.println("Waiting for input FirstClient turn");
-                String stringTurn = reader.readLine();
-                String[] turn = stringTurn.split(",");
-                game.makeTurn("X", Integer.parseInt(turn[0]), Integer.parseInt(turn[1]));
+                while (true) {
+                    String stringTurn = reader.readLine();
+                    String[] turn = stringTurn.split(",");
+                    int lastI = Integer.parseInt(turn[0]);
+                    int lastJ = Integer.parseInt(turn[1]);
+                    if (game.isTurnAvailable(lastI, lastJ)) {
+                        game.makeTurn("X", lastI, lastJ);
+                        break;
+                    }
+                    writer.println("Input right data");
+                    writer.println("inputError");
+                }
                 try {
                     writer.println(game.showField());
                     queue.put(game);
