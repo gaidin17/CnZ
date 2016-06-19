@@ -11,7 +11,7 @@ import java.net.Socket;
 
 public class Client {
     private final Logger logger = LoggerFactory.getLogger(Client.class);
-    GameClient gameClient;
+    private GameClient gameClient;
 
     private String server;
     private int port;
@@ -19,7 +19,7 @@ public class Client {
     public static void main(String[] args) {
         Client client = new Client();
         client.setConnectionParam("localhost", 999);
-        GameClient gameClient = new TicTacToeGameClient();
+        TicTacToeGameClient gameClient = new TicTacToeGameClient();
         client.setGameClient(gameClient);
         client.startClient();
     }
@@ -33,10 +33,9 @@ public class Client {
             if (gameClient == null) {
                 return;
             }
-            gameClient.setSocket(socket);
-            gameClient.startGame();
+            gameClient.startGame(socket);
         } catch (IOException ex) {
-        logger.error("Error: ", ex);
+            logger.error("Error: ", ex);
         }
     }
 

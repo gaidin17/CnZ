@@ -8,5 +8,4 @@ import java.net.Socket;
 public interface GameServer {
     void setSocket(Socket socket);
     void startGame();
-    void setTurnOrder(int turnOrder);
 }

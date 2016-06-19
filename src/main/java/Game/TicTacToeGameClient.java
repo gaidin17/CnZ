@@ -15,38 +15,37 @@ import java.net.Socket;
  */
 public class TicTacToeGameClient implements GameClient {
     private final Logger logger = LoggerFactory.getLogger(TicTacToeGameClient.class);
-    Socket socket;
 
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
-
-    public void startGame() {
+    public void startGame(Socket socket) {
         try (PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
              BufferedReader readerIn = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
-            String message = null;
-            String response = null;
+            String response;
             boolean isExit = false;
             while (true) {
+                label:
                 while (true) {
                     response = readerIn.readLine();
-
-                    if (response.equals(ResponseEnd.MESSAGE_END)) {
-                        break;
-                    } else if (response.equals(ResponseEnd.NEXT_TURN) || response.equals(ResponseEnd.INPUT_ERROR)) {
-                        System.in.read(new byte[System.in.available()]);
-                        String string = reader.readLine();
-                        writer.println(string);
-                        if (string.equals(ResponseEnd.CLIENT_STOP)) {
-                            isExit = true;
+                    if (response != null) {
+                        switch (response) {
+                            case ResponseEnd.GAME_FIELD:
+                            case ResponseEnd.MESSAGE_END:
+                                break label;
+                            case ResponseEnd.NEXT_TURN:
+                            case ResponseEnd.INPUT_ERROR:
+                                System.in.read(new byte[System.in.available()]);
+                                String string = reader.readLine();
+                                writer.println(string);
+                                if (string.equals(ResponseEnd.CLIENT_STOP)) {
+                                    isExit = true;
+                                }
+                                break label;
+                            case ResponseEnd.GAME_OVER:
+                                isExit = true;
+                                break label;
                         }
-                        break;
-                    } else if (response.equals(ResponseEnd.GAME_OVER)) {
-                        isExit = true;
-                        break;
+                        System.out.println(response);
                     }
-                    System.out.println(response);
                 }
                 if (isExit) {
                     break;

@@ -1,5 +1,7 @@
 package Game;
 
+import MessengerUtils.MessageReciever;
+import ServerClientConstants.PlayersType;
 import ServerClientConstants.ResponseEnd;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,120 +16,132 @@ import java.util.concurrent.SynchronousQueue;
 /**
  * Created by Evgeny_Akulenko on 6/9/2016.
  */
-public class TicTacToeGameServer implements GameServer {
-    private final Logger logger = LoggerFactory.getLogger(TicTacToeGameServer.class);
-    private static final String X = "X";
-    private static final String O = "O";
-    private SynchronousQueue<Game> queue;
+public class TicTacToeGameServer extends Thread {
+    private static final Logger logger = LoggerFactory.getLogger(TicTacToeGameServer.class);
+    private final SynchronousQueue<Game> queue;
+    private boolean isEndOfGame;
+    private PlayersType playerType;
     private Game game;
-    private int turnOrder;
-    private static int playersCount = 0;
-    private Socket socket;
+    private final int turnOrder;
+    private final Socket socket;
+    private volatile static int playersCount = 0;
 
-    public TicTacToeGameServer(SynchronousQueue<Game> queue, Game game) {
+    public TicTacToeGameServer(Socket socket, int turnOrder, SynchronousQueue<Game> queue, Game game) {
+        this.socket = socket;
         this.game = game;
         this.queue = queue;
-    }
-
-    public void setSocket(Socket socket) {
-        this.socket = socket;
-    }
-
-    public void setTurnOrder(int turnOrder) {
         this.turnOrder = turnOrder;
         playersCount++;
     }
 
-    @Override
-    public void startGame() {
+    public void run() {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
-            int i = 0;
-            String playerType;
-            if (turnOrder == 0) {
-                playerType = X;
-                writer.println("Waiting for another player connect");
-                writer.println("end");
-            } else {
-                playerType = O;
+            MessageReciever messageReciever = new MessageReciever(writer);
+            int stepCount = 0;
+
+            setPlayerType();
+
+            if (playerType.equals(PlayersType.X)) {
+                waitForAnotherPlayers(messageReciever);
             }
-            while (playersCount != 2) {
-                writer.println(".");
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException ex) {
-                    logger.error("Error: ", ex);
-                }
-            }
-            writer.println("end");
-            writer.println("All players are ready");
-            writer.println("You are play like: " + playerType);
-            writer.println(ResponseEnd.MESSAGE_END);
+
+            messageReciever.sendMessage("All players are ready\nYou are play like: " + playerType, ResponseEnd.MESSAGE_END);
 
             while (true) {
-                System.out.println("client step N:" + i);
-                if (turnOrder != 0 || (turnOrder == 0 && i != 0)) {
+                if (turnOrder != 0 || stepCount != 0) {
                     try {
                         game = queue.take();
                     } catch (InterruptedException ex) {
                         logger.error("Error: ", ex);
                     }
                 }
-                if (game.getWinner() != null) {
-                    writer.println("Oops...you lose!");
-                    writer.println(game.showField());
-                    writer.println(ResponseEnd.GAME_OVER);
-                    break;
-                } else if (game.isNoWinner()) {
-                    writer.println("Nobody Wins");
-                    writer.println(game.showField());
-                    writer.println(ResponseEnd.GAME_OVER);
-                    break;
-                } else {
-                    writer.println("Make turn!");
-                    writer.println(game.showField());
-                    writer.println(ResponseEnd.NEXT_TURN);
-                }
 
+                checkEndOfGame(messageReciever);
+
+                if (isEndOfGame) {
+                    break;
+                }
+                messageReciever.sendMessage("Make turn", ResponseEnd.MESSAGE_END);
+                messageReciever.sendMessage(game.showField(), ResponseEnd.GAME_FIELD);
+                messageReciever.sendMessage("", ResponseEnd.NEXT_TURN);
                 while (true) {
                     String stringTurn = reader.readLine();
                     String[] turn = stringTurn.split(",");
-                    int lastI = Integer.parseInt(turn[0]);
-                    int lastJ = Integer.parseInt(turn[1]);
-                    if (game.isTurnAvailable(lastI, lastJ)) {
-                        game.makeTurn(playerType, lastI, lastJ);
-                        break;
-
+                    try {
+                        int lastI = Integer.parseInt(turn[0]);
+                        int lastJ = Integer.parseInt(turn[1]);
+                        if (game.isTurnAvailable(lastI, lastJ)) {
+                            game.makeTurn(playerType, lastI, lastJ);
+                            messageReciever.sendMessage(game.showField(), ResponseEnd.GAME_FIELD);
+                            messageReciever.sendMessage("Turn is Done", ResponseEnd.MESSAGE_END);
+                            break;
+                        } else {
+                            messageReciever.sendMessage("Error! Please enter the correct data!", ResponseEnd.INPUT_ERROR);
+                        }
+                    } catch (NumberFormatException ex) {
+                        messageReciever.sendMessage("Error! Please enter the correct data!", ResponseEnd.INPUT_ERROR);
                     }
-                    writer.println("Error!!!");
-                    writer.println("Please enter the correct data!");
-                    writer.println(ResponseEnd.INPUT_ERROR);
                 }
+
                 try {
-                    writer.println(game.showField());
-                    writer.println("Turn is Done");
-                    writer.println(ResponseEnd.MESSAGE_END);
+                    checkEndOfGame(messageReciever);
                     queue.put(game);
-                    if (game.getWinner() != null) {
-                        writer.println("Great!!! You WIN!!!");
-                        writer.println(ResponseEnd.GAME_OVER);
+                    if (isEndOfGame) {
                         break;
-                    } else if (game.isNoWinner()) {
-                        writer.println("Nobody Wins");
-                        writer.println(game.showField());
-                        writer.println(ResponseEnd.GAME_OVER);
-                        break;
-                    } else {
-                        writer.println("Waiting for another player turn...");
-                        writer.println(ResponseEnd.MESSAGE_END);
                     }
                 } catch (InterruptedException ex) {
                     logger.error("Error: ", ex);
                 }
-                i++;
+                messageReciever.sendMessage("Waiting for another player turn...", ResponseEnd.MESSAGE_END);
+                stepCount++;
             }
         } catch (IOException ex) {
             logger.error("Error: ", ex);
+        } finally {
+            if (socket != null) {
+                try {
+                    socket.close();
+                } catch (IOException ex) {
+                    logger.error("Error", ex);
+                }
+
+            }
+        }
+    }
+
+    private void setPlayerType() {
+        if (turnOrder == 0) {
+            playerType = PlayersType.X;
+        } else {
+            playerType = PlayersType.O;
+        }
+    }
+
+    private void waitForAnotherPlayers(MessageReciever messageReciever) {
+        messageReciever.sendMessage("Waiting for another player connect", "end");
+        while (playersCount != 2) {
+            messageReciever.sendMessage(".", "end");
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                logger.error("Error: ", ex);
+            }
+        }
+    }
+
+    private void checkEndOfGame(MessageReciever messageReciever) {
+        if (game.getWinner() != null) {
+            if (game.getWinner().equals(playerType)) {
+                messageReciever.sendMessage("Great! You win!", ResponseEnd.GAME_OVER);
+            } else {
+                messageReciever.sendMessage(game.showField(), ResponseEnd.GAME_FIELD);
+                messageReciever.sendMessage("Sorry. You lose!", ResponseEnd.GAME_OVER);
+            }
+            isEndOfGame = true;
+        } else if (game.isNoWinner()) {
+            messageReciever.sendMessage("Nobody Wins", ResponseEnd.GAME_OVER);
+            isEndOfGame = true;
         }
     }
 }

@@ -1,34 +1,37 @@
 package Game;
 
 
+import ServerClientConstants.PlayersType;
+
 /**
  * Created by Evgeny_Akulenko on 6/8/2016.
  */
 public class TicTacToe implements Game {
     private String[][] gameField = {{" ", " ", " "}, {" ", " ", " "}, {" ", " ", " "}};
-    private String winner;
+    private PlayersType winner;
     private boolean isNoWinner;
     private TicTacToeTurnTester ticTacToeTurnTester = new TicTacToeTurnTester(gameField);
 
-    public void makeTurn(String type, int i, int j) {
+    public void makeTurn(PlayersType playersType, int i, int j) {
+        String type = playersType.toString();
         gameField[i][j] = type;
-        if (ticTacToeTurnTester.testIsWinner(type, i, j)) {
-            setWinner(type);
+        if (ticTacToeTurnTester.testIsWinner(playersType, i, j)) {
+            setWinner(playersType);
         }
-        if (ticTacToeTurnTester.testIsEnd()){
+        if (ticTacToeTurnTester.testIsEnd()) {
             isNoWinner = true;
         }
     }
 
-    public String getWinner() {
-        return this.winner;
+    public PlayersType getWinner() {
+        return winner;
     }
 
-    private void setWinner(String type) {
+    private void setWinner(PlayersType type) {
         this.winner = type;
     }
 
-    public boolean isNoWinner(){
+    public boolean isNoWinner() {
         return isNoWinner;
     }
 
@@ -36,17 +39,14 @@ public class TicTacToe implements Game {
         if (!(i >= 0 && i < gameField.length) || !(j >= 0 && j < gameField[0].length)) {
             return false;
         }
-        if (!gameField[i][j].equals(" ")) {
-            return false;
-        }
-        return true;
+        return gameField[i][j].equals(" ");
     }
 
     public String showField() {
-        StringBuffer stringBuffer = new StringBuffer();
-        for (int i = 0; i < gameField.length; i++) {
-            for (int j = 0; j < gameField[i].length; j++) {
-                stringBuffer.append(gameField[i][j]);
+        StringBuilder stringBuffer = new StringBuilder();
+        for (String[] aGameField : gameField) {
+            for (String anAGameField : aGameField) {
+                stringBuffer.append(anAGameField);
                 stringBuffer.append("|");
             }
             stringBuffer.append("\n");
